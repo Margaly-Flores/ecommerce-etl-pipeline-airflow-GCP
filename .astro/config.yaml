@@ -1,0 +1,6 @@
+project:
+    name: my-project-astro-gcp
+postgres:
+  port: 5433
+webserver:
+  port: 8080
