@@ -136,3 +136,9 @@ El DAG ejecuta las siguientes tareas en orden:
 2. **load_orders** - Carga órdenes a BigQuery
 3. **run_dataproc_transform_join** - Ejecuta transformación PySpark
 4. **Dummy_Message_OP** - Mensaje de finalización
+
+## Notas
+
+- El DAG está configurado con `schedule=None` (ejecución manual)
+- `catchup=False` - No ejecuta runs históricos
+- Dataproc Serverless elimina el cluster automáticamente después de la ejecución 
