@@ -1,45 +1,138 @@
-Overview
-========
+# ETL Pipeline: E-commerce Data con Airflow, GCS, BigQuery y Dataproc
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+Pipeline ETL automatizado para procesar datos de e-commerce usando Apache Airflow en Astronomer, Google Cloud Storage, BigQuery y Dataproc Serverless.
 
-Project Contents
-================
+## Descripción
 
-Your Astro project contains the following files and folders:
+Este proyecto implementa un pipeline de datos que:
+1. Carga archivos JSON (productos y pedidos) desde Google Cloud Storage a BigQuery
+2. Ejecuta un job de PySpark en Dataproc Serverless para transformar y enriquecer los datos
+3. Genera una tabla final con pedidos enriquecidos incluyendo información de productos y métricas calculadas
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes one example DAG:
-    - `example_astronauts`: This DAG shows a simple ETL pipeline example that queries the list of astronauts currently in space from the Open Notify API and prints a statement for each astronaut. The DAG uses the TaskFlow API to define tasks in Python, and dynamic task mapping to dynamically print a statement for each astronaut. For more on how this DAG works, see our [Getting started tutorial](https://www.astronomer.io/docs/learn/get-started-with-airflow).
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
+## Arquitectura
+```
+GCS (productos.json, orders.json) 
+    ↓
+BigQuery (retail_data.products, retail_data.orders)
+    ↓
+Dataproc Serverless (PySpark - transformación y join)
+    ↓
+BigQuery (retail_data.enriched_orders)
+```
 
-Deploy Your Project Locally
-===========================
+## Tecnologías
 
-Start Airflow on your local machine by running 'astro dev start'.
+- **Apache Airflow** (Astronomer)
+- **Google Cloud Storage** (GCS)
+- **Google BigQuery**
+- **Google Dataproc Serverless**
+- **PySpark**
 
-This command will spin up five Docker containers on your machine, each for a different Airflow component:
+## Estructura del Proyecto
+```
+my-project-astro-gcp/
+├── dags/
+│   └── ecomm_data_pipeline_airflow_dag.py    # DAG principal
+├── scripts/
+│   └── transform_join_ecommerce.py           # Script PySpark
+├── Dockerfile
+├── packages.txt
+├── requirements.txt
+└── README.md
+```
 
-- Postgres: Airflow's Metadata Database
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-- DAG Processor: The Airflow component responsible for parsing DAGs
-- API Server: The Airflow component responsible for serving the Airflow UI and API
-- Triggerer: The Airflow component responsible for triggering deferred tasks
+## Configuración
 
-When all five containers are ready the command will open the browser to the Airflow UI at http://localhost:8080/. You should also be able to access your Postgres Database at 'localhost:5432/postgres' with username 'postgres' and password 'postgres'.
+### Prerequisitos
 
-Note: If you already have either of the above ports allocated, you can either [stop your existing Docker containers or change the port](https://www.astronomer.io/docs/astro/cli/troubleshoot-locally#ports-are-not-available-for-my-local-airflow-webserver).
+- Cuenta de Google Cloud Platform
+- Astronomer Cloud account
+- Astro CLI instalado
+- Docker Desktop corriendo
 
-Deploy Your Project to Astronomer
-=================================
+### Variables de Airflow
 
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://www.astronomer.io/docs/astro/deploy-code/
+Configura las siguientes variables en Airflow UI:
 
-Contact
-=======
+| Variable | Valor | Descripción |
+|----------|-------|-------------|
+| `gcpproject_id_new` | `tu-project-id` | ID del proyecto GCP |
 
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support.
+### Conexiones de Airflow
+
+Crea la siguiente conexión en Airflow UI:
+
+- **Connection ID**: `gcp_conn_new`
+- **Connection Type**: `Google Cloud`
+- **Project ID**: Tu project ID de GCP
+- **Keyfile JSON**: Service account key con permisos necesarios
+
+### Recursos en GCP
+
+**Buckets de Cloud Storage:**
+- `astro-airflow-project_bucket` - Archivos fuente y scripts
+- `bq-temp-gds-bucket` - Archivos temporales de BigQuery
+
+**Estructura de archivos en GCS:**
+```
+gs://astro-airflow-project_bucket/
+├── datasets/
+│   ├── products/
+│   │   └── products.json
+│   └── orders/
+│       └── orders.json
+└── scripts/
+    └── transform_join_ecommerce.py
+```
+
+**Dataset de BigQuery:**
+- Dataset: `retail_data`
+- Tablas creadas automáticamente:
+  - `products`
+  - `orders`
+  - `enriched_orders`
+
+## Esquema de Datos
+
+### Tabla Final: `enriched_orders`
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| order_id | STRING | ID único del pedido |
+| user_id | STRING | ID del usuario |
+| product_id | STRING | ID del producto |
+| name | STRING | Nombre del producto |
+| category | STRING | Categoría del producto |
+| price | FLOAT | Precio unitario |
+| quantity | INTEGER | Cantidad ordenada |
+| total_price | FLOAT | Precio total (price × quantity) |
+| stock | BOOLEAN | Disponibilidad en stock |
+| price_tier | STRING | Categoría de precio (Low/Medium/High) |
+| order_dt | DATE | Fecha del pedido |
+
+## Ejecución del Pipeline
+
+### Deploy a Astronomer
+```bash
+# Autenticar
+astro login
+
+# Deploy
+astro deploy
+```
+
+### Ejecutar el DAG
+
+1. Accede a Airflow UI desde Astronomer
+2. Encuentra el DAG: `gcs_to_bq_dataproc_ecommerce`
+3. Activa el toggle si está pausado
+4. Click en "Trigger DAG" para ejecutar manualmente
+
+### Monitoreo
+
+El DAG ejecuta las siguientes tareas en orden:
+
+1. **load_products** - Carga productos a BigQuery
+2. **load_orders** - Carga órdenes a BigQuery
+3. **run_dataproc_transform_join** - Ejecuta transformación PySpark
+4. **Dummy_Message_OP** - Mensaje de finalización
